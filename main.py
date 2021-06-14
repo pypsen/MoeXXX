@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
 import telebot
 from telebot import types
 import time
@@ -43,6 +49,7 @@ def buy(client_id, ticker, quantity):
         clients[client_id]['stocks'][ticker] = {'buy_price': 0, 'quantity': 0}
     clients[client_id]['account'] -= cost
     clients[client_id]['stocks'][ticker]['quantity'] += quantity
+    clients[client_id]['stocks'][ticker]['buy_price'] = stocks[ticker]['current_price']
 
 def sell(client_id, ticker, quantity):
     global stocks, clients                                               #возможно while
@@ -52,15 +59,37 @@ def sell(client_id, ticker, quantity):
     clients[client_id]['account'] += cost
     clients[client_id]['stocks'][ticker]['quantity'] -= quantity
 
-def stocks_to_string(client_id):
-    global stocks
-    s = 'Ваши акции: \n'
-    lie = clients[client_id]['account']
+def stocks_to_string(client_id, message):
+    global stocks, total_cost
+    total_cost = 0
+    bot.send_message(message.chat.id, text='*Ваш портфель*', parse_mode = 'Markdown') 
     for item in sorted(clients[client_id]['stocks'].keys()):
-        s += item + ': ' + str(clients[client_id]['stocks'][item]['quantity']) + ' цена: ' + str(stocks[item]['current_price'] )+ '\n'
-        lie += clients[client_id]['stocks'][item]['quantity']*stocks[item]['current_price']
-    s =  s + 'Кол-во денег на счету: ' + str(clients[client_id]['account']) + ' bucks' + '\n'
-    s += 'Совокупная стоимость всех активов:  ' + str(lie)
+        s =  stock_to_string(client_id, item,  message)
+        bot.send_message(message.chat.id, text=s, parse_mode = 'Markdown')
+        
+    total_cost += clients[client_id]['account']
+    s = 'Валюта: '  + '{:>10.2f}'.format(clients[client_id]['account']) 
+    bot.send_message(message.chat.id, text=s, parse_mode = 'Markdown')
+    s = 'Стомость всех активов: ' + '{:>10.2f}'.format(total_cost) 
+    bot.send_message(message.chat.id, text=s, parse_mode = 'Markdown')        
+    
+    
+def stock_to_string(client_id, item,  message):
+    
+    global clients, stocks, total_cost
+
+    q = '{:>20}'.format(clients[client_id]['stocks'][item]['quantity'])
+    buy_p = '{:>12}'.format(clients[client_id]['stocks'][item]['buy_price'])
+    cur_p = '{:>11.2f}'.format(stocks[item]['current_price'])
+    cost = '{:>16.2f}'.format(float(cur_p)*float(q))
+    total_cost += float(cost)
+
+    s = '*' + item + '*' +'\n'
+    s += 'Количество: ' + q + '\n'
+    s += 'Цена покупки: ' + buy_p + '\n'
+    s += 'Текущая цена: ' + cur_p + '\n'
+    s += 'Стоимость: ' + cost
+
     return s
 
 
@@ -247,8 +276,9 @@ def get_quotes(ticker, period, interval):
     else:
         return 'неправильные данные'
 
+token ='1879589421:AAEjb6TKhChdjsLIEDFE_3lKJL3p8IfBHL4'
 
-bot = telebot.TeleBot("1879589421:AAEjb6TKhChdjsLIEDFE_3lKJL3p8IfBHL4")  # тут токен типа удалить бы надо
+bot = telebot.TeleBot(token)  # тут токен типа удалить бы надо
 
 
 @bot.message_handler(commands=['start'])
@@ -296,8 +326,9 @@ def responser(message, text='а там армяне в нарды играют')
     fuckt = 0
     if message.text == 'Портфель':
         fuckt = 1
-        s = stocks_to_string(message.from_user.id)
-        msg = bot.send_message(message.chat.id, text=s)
+        
+        stocks_to_string(message.from_user.id, message)
+        
         bot.send_message(message.chat.id,
                          text='Чтобы совершить операцию с акциями из вашего портфеля, введите интересующий вас тикер',
                          reply_markup=keyboardbig)
@@ -382,15 +413,15 @@ def responser(message, text='а там армяне в нарды играют')
             ans = 'купить' if action == 1 else 'продать'
             vol = quantity * price
             bot.send_message(message.chat.id,
-                             text=f'Итак, вы хотите {ans} {str(quantity)} {stock} на сумму {vol}  bucks. Подтвердите выбор')
+                             text=f'Итак, вы хотите {ans} *{str(quantity)}* {stock} на сумму *{vol}*  bucks. Подтвердите выбор', parse_mode = 'Markdown')
             keyboard = types.ReplyKeyboardMarkup(row_width=2)
             keyboard.add(types.KeyboardButton('Да'), types.KeyboardButton('Нет'))
             msg = bot.send_message(message.from_user.id,
-                                   text='Если вы ошиблись в количестве, просто введите необходимое количество',
+                                   text='Если вы ошиблись в количестве акций, просто введите другое число',
                                    reply_markup=keyboard)
         else:
             bot.send_message(message.from_user.id,
-                             text='Чета не выбрал ты акцию обманщик')
+                             text='Вы не выбрали акцию')
             send_keyboard(message)
 
     if message.text == 'Да' and (stock, action, quantity) != ('', -1, 0):
@@ -400,8 +431,9 @@ def responser(message, text='а там армяне в нарды играют')
         else:
             sell(message.from_user.id, stock, quantity)
         (stock, action, quantity) = ('', -1, 0)
-        s = stocks_to_string(message.from_user.id)
-        msg = bot.send_message(message.chat.id, text=s)
+        
+        stocks_to_string(message.from_user.id, message)
+
         bot.send_message(message.chat.id,
                          text='Чтобы совершить операцию с акциями из вашего портфеля, введите интересующий вас тикер',
                          reply_markup=keyboardbig)
@@ -414,5 +446,4 @@ def responser(message, text='а там армяне в нарды играют')
 
 
 bot.infinity_polling()
-
 
