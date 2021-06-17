@@ -55,10 +55,10 @@ def sell(client_id, ticker, quantity):
     global stocks, clients                                               #возможно while
     cost = stocks[ticker]['current_price'] * quantity
     if ticker not in clients[client_id]['stocks'].keys():
-        clients[client_id]['stocks'][ticker] = {'buy_price': 0, 'quantity': 0}
-    clients[client_id]['account'] += cost
+        clients[client_id]['stocks'][ticker] = {'buy_price': stocks[ticker]['current_price'], 'quantity': 0}
     if quantity < clients[client_id]['stocks'][ticker]['quantity']:
         clients[client_id]['stocks'][ticker]['buy_price'] = stocks[ticker]['current_price']
+    clients[client_id]['account'] += cost
     clients[client_id]['stocks'][ticker]['quantity'] -= quantity
 
 
@@ -452,6 +452,7 @@ def responser(message, text='а там армяне в нарды играют')
             quantity = int(message.text)
             ans = 'купить' if action == 1 else 'продать'
             vol = quantity * price
+            vol_s = '{:>10.2f}'.format(vol)
             bot.send_message(message.chat.id,
                              text=f'Итак, вы хотите {ans} *{str(quantity)}* {stock} на сумму *{vol}*  bucks. Подтвердите выбор',
                              parse_mode='Markdown')
